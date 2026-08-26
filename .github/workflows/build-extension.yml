@@ -1,3 +1,4 @@
+# WhyDOM extension build and test artifact workflow
 name: Build WhyDOM Extension
 
 on:
