@@ -124,21 +124,26 @@
     event.stopPropagation();
     event.stopImmediatePropagation();
 
-    stopPicker();
-
     try {
       const snapshot = WhyDOM.captureElement(target);
       WhyDOM.lastSnapshot = snapshot;
+
       const copied = await writeClipboard(snapshot.copyCss);
       const width = Math.round(snapshot.layoutFacts.rect.width);
       const height = Math.round(snapshot.layoutFacts.rect.height);
       const overflow = snapshot.layoutFacts.scroll.overflowsX || snapshot.layoutFacts.scroll.overflowsY;
       const suffix = overflow ? " · overflow detected" : "";
 
+      chrome.runtime.sendMessage({
+        type: "WHYDOM_CAPTURED",
+        snapshot
+      }).catch(() => {});
+
+      clearHighlight();
       showToast(
         copied
-          ? `CSS copied · ${width} × ${height}${suffix}`
-          : "Element captured, but clipboard copy failed",
+          ? `CSS copied · ${width} × ${height}${suffix} · picker still active`
+          : "Element captured · picker still active · clipboard copy failed",
         copied ? "success" : "error"
       );
 
@@ -150,12 +155,11 @@
   }
 
   function onKeyDown(event) {
-    if (!state.active) return;
-    if (event.key !== "Escape") return;
+    if (!state.active || event.key !== "Escape") return;
 
     event.preventDefault();
     stopPicker();
-    showToast("WhyDOM picker cancelled", "neutral");
+    showToast("WhyDOM inspection ended", "neutral");
   }
 
   function startPicker() {
@@ -167,7 +171,7 @@
     document.addEventListener("pointermove", onPointerMove, true);
     document.addEventListener("click", onClick, true);
     document.addEventListener("keydown", onKeyDown, true);
-    showToast("WhyDOM active · click an element · Esc to cancel", "neutral");
+    showToast("WhyDOM active · pick as many elements as you want · Esc to exit", "neutral");
   }
 
   function stopPicker() {
@@ -181,18 +185,35 @@
     clearHighlight();
   }
 
+  function togglePicker() {
+    if (state.active) {
+      stopPicker();
+      showToast("WhyDOM inspection ended", "neutral");
+      return false;
+    }
+
+    startPicker();
+    return true;
+  }
+
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === "WHYDOM_PING") {
-      sendResponse({ ok: true });
+      sendResponse({ ok: true, active: state.active });
       return;
     }
 
     if (message?.type === "WHYDOM_START_PICKER") {
       startPicker();
-      sendResponse({ ok: true });
+      sendResponse({ ok: true, active: state.active });
+      return;
+    }
+
+    if (message?.type === "WHYDOM_TOGGLE_PICKER") {
+      sendResponse({ ok: true, active: togglePicker() });
     }
   });
 
   WhyDOM.startPicker = startPicker;
   WhyDOM.stopPicker = stopPicker;
+  WhyDOM.togglePicker = togglePicker;
 })();
