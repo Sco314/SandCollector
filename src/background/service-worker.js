@@ -28,15 +28,58 @@ async function ensureContentScripts(tabId) {
   });
 }
 
+function snapshotKey(tabId) {
+  return `whydom:snapshot:${tabId}`;
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
+});
+
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab.id || !isInspectableUrl(tab.url)) {
     return;
   }
 
   try {
+    await chrome.sidePanel.open({ tabId: tab.id });
     await ensureContentScripts(tab.id);
-    await chrome.tabs.sendMessage(tab.id, { type: "WHYDOM_START_PICKER" });
+    await chrome.tabs.sendMessage(tab.id, { type: "WHYDOM_TOGGLE_PICKER" });
   } catch (error) {
     console.error("WhyDOM could not start on this page.", error);
   }
+});
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "WHYDOM_CAPTURED" && sender.tab?.id && message.snapshot) {
+    const tabId = sender.tab.id;
+    const key = snapshotKey(tabId);
+
+    chrome.storage.session
+      .set({ [key]: message.snapshot })
+      .then(() => {
+        chrome.runtime.sendMessage({
+          type: "WHYDOM_SNAPSHOT_UPDATED",
+          tabId,
+          snapshot: message.snapshot
+        }).catch(() => {});
+      })
+      .catch((error) => console.error("WhyDOM could not store snapshot.", error));
+
+    sendResponse({ ok: true });
+    return;
+  }
+
+  if (message?.type === "WHYDOM_GET_SNAPSHOT" && Number.isInteger(message.tabId)) {
+    const key = snapshotKey(message.tabId);
+    chrome.storage.session
+      .get(key)
+      .then((result) => sendResponse({ ok: true, snapshot: result[key] || null }))
+      .catch((error) => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  chrome.storage.session.remove(snapshotKey(tabId)).catch(() => {});
 });
