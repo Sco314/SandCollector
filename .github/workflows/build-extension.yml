@@ -43,6 +43,9 @@ jobs:
               Path('src/content/element-snapshot.js'),
               Path('src/content/picker.js'),
               Path('src/content/picker.css'),
+              Path('src/panel/panel.html'),
+              Path('src/panel/panel.css'),
+              Path('src/panel/panel.js'),
           ]
 
           missing = [str(path) for path in required if not (root / path).is_file()]
@@ -52,6 +55,10 @@ jobs:
           service_worker = manifest.get('background', {}).get('service_worker')
           if not service_worker or not (root / service_worker).is_file():
               raise SystemExit(f'Invalid background service worker path: {service_worker!r}')
+
+          panel_path = manifest.get('side_panel', {}).get('default_path')
+          if not panel_path or not (root / panel_path).is_file():
+              raise SystemExit(f'Invalid side panel path: {panel_path!r}')
 
           print(f"Validated {manifest['name']} v{manifest['version']} (Manifest V3)")
           PY
