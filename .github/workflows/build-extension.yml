@@ -63,6 +63,15 @@ jobs:
           print(f"Validated {manifest['name']} v{manifest['version']} (Manifest V3)")
           PY
 
+      - name: Syntax check extension JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/background/service-worker.js
+          node --check src/content/element-snapshot.js
+          node --check src/content/picker.js
+          node --check src/panel/panel.js
+
       - name: Build unpacked extension directory
         shell: bash
         run: |
