@@ -18,24 +18,46 @@ Future interaction workflow:
 
 **Trace → Correlate → Explain → Patch**
 
-## Current MVP
-
-The first working extension skeleton is implemented with no build step.
+## Current build: v0.2.0
 
 Current behavior:
 
-- Click the WhyDOM toolbar action to activate the picker
+- Click the WhyDOM toolbar action to open the inspector side panel and activate the picker
 - Hover elements to highlight them and see dimensions
 - Click an element to capture it without triggering the page action
-- Copy a useful computed CSS block to the clipboard automatically
-- Generate a stable selector where practical
+- Keep the picker active after a capture so multiple elements can be inspected in one session
+- Switch away from the page and return without intentionally ending that page's inspection session
+- Press Escape or click the toolbar action again to end the picker session
+- Copy a useful computed CSS block to the clipboard automatically on every capture
+- Show the latest capture in a persistent side panel
+- Copy CSS, selector, or HTML from the side panel
+- Prefer short, stable unique selectors before using ancestor chains or positional selectors
 - Capture a structured element snapshot for future diagnostics
 - Record element geometry and overflow facts
 - Record parent and ancestor layout facts
 - Record stacking-context clues
 - Collect matching authored CSS rules when stylesheet access is allowed
 - Track inaccessible stylesheets instead of failing the capture
-- Press Escape to cancel the picker
+- Store the latest snapshot per tab for the current browser session
+
+## Inspector side panel
+
+The current INSPECT panel shows:
+
+- selected selector
+- width and height
+- display and positioning mode
+- box sizing and min/max width
+- overflow settings and measured overflow warning
+- z-index
+- parent selector and layout facts
+- stacking-context reasons when detected
+- generated useful CSS
+- element text preview
+- matching authored rule count
+- copy CSS, selector, and HTML actions
+
+The WHY, TRACE, and CHANGES tabs are visible as product direction but are not enabled yet.
 
 ## Element snapshot foundation
 
@@ -58,37 +80,41 @@ This data model is intended to support the WHY engine without replacing the free
 
 ## Next development milestones
 
-### 1. Inspector side panel
+### 1. Overflow WHY diagnostic
 
-Create a persistent panel for dimensions, box model, layout, typography, colors, authored CSS, and copy actions.
+Answer why a selected element or its contents overflow by evaluating measured geometry and constraints such as fixed widths, minimum widths, flex sizing, grid tracks, white-space, replaced elements, transforms, and positioned descendants.
 
-### 2. Overflow WHY diagnostic
+The first diagnostic should return evidence, a primary cause when confidence is high, and one or more testable fixes rather than a generic list of possibilities.
 
-Answer why a selected element or its contents overflow by evaluating measured geometry and likely constraints such as fixed widths, minimum widths, flex sizing, grid tracks, white-space, replaced elements, transforms, and positioned descendants.
+### 2. Try Fix + verification
 
-### 3. Try Fix
+Apply a proposed change to the live page, remeasure the result, and verify whether the diagnosed problem was resolved. Support undo immediately.
 
-Apply a proposed change to the live page, remeasure the result, and verify whether the diagnosed problem was resolved.
+### 3. Flex WHY diagnostic
 
-### 4. Additional deterministic diagnostics
+Explain common flex failures such as a child that will not shrink, unexpected stretching, alignment surprises, and width controlled by flex-basis or intrinsic content.
 
-- Flex sizing and alignment
-- Grid sizing and placement
-- Stacking contexts and z-index
-- Sticky positioning
-- Positioning and containing blocks
-- Visibility and covered elements
-- Text wrapping and clipping
+### 4. Stacking context / z-index WHY diagnostic
 
-### 5. Changes
+Build and explain the relevant stacking-context chain and identify the ancestor that prevents a high z-index from winning.
+
+### 5. Sticky WHY diagnostic
+
+Explain sticky failures using scroll ancestors, overflow, containing geometry, inset requirements, and element/container dimensions.
+
+### 6. CHANGES
 
 Track live fixes, undo them, and export the resulting CSS or diff.
 
-### 6. Trace
+### 7. State comparison
+
+Capture state A and state B and compare DOM attributes/classes, computed styles, children, ARIA state, and relevant layout changes.
+
+### 8. TRACE
 
 Correlate a user interaction with events, DOM mutations, class and attribute changes, network activity, storage changes, navigation, and resulting UI state.
 
-### 7. Source patching
+### 9. Source patching
 
 Map verified browser fixes back to source rules when practical and generate a minimal patch.
 
@@ -102,24 +128,30 @@ Map verified browser fixes back to source rules when practical and generate a mi
 6. Pin WhyDOM to the toolbar.
 7. Open a normal webpage and click the WhyDOM toolbar button.
 
-Changes to extension files require reloading the extension from `chrome://extensions`. Page changes generally require refreshing the page before testing again.
+After changing extension files, reload WhyDOM from `chrome://extensions` and refresh the page being tested.
 
 ## Permission model
 
-The MVP intentionally avoids blanket host permissions. It currently uses:
+WhyDOM avoids blanket host permissions. The current build uses:
 
 - `activeTab`
 - `scripting`
 - `clipboardWrite`
+- `storage`
+- `sidePanel`
 
-The content inspector is injected only after the user explicitly clicks the WhyDOM toolbar action on the current page.
+The content inspector is injected only after the user explicitly clicks the WhyDOM toolbar action on the current page. Session storage is used for the latest captured snapshot for each tab; the current build does not send captured page data to a remote service.
+
+## Build artifacts
+
+GitHub Actions validates the Manifest V3 package and required extension files, builds a clean unpacked directory, creates a ZIP, and uploads both as short-lived workflow artifacts on relevant pushes or manual runs.
 
 ## Technical baseline
 
 - Chrome Extension Manifest V3
 - Plain JavaScript, HTML, and CSS initially
-- No build step for the MVP
-- GitHub repository and future Actions-based release workflow
-- Chrome Web Store distribution
+- No application bundler required for the current build
+- GitHub Actions build and test-artifact workflow
+- Chrome Web Store distribution target
 
 The architecture should stay modular enough to add a UI framework or build pipeline later only if the product actually benefits from one.
