@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WhyDOM</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <div class="brand">WhyDOM</div>
+      <div class="tagline">Click it. Know why.</div>
+    </div>
+    <div id="sessionStatus" class="session-status">INSPECT</div>
+  </header>
+
+  <nav class="tabs" aria-label="WhyDOM tools">
+    <button class="tab active" type="button">INSPECT</button>
+    <button class="tab upcoming" type="button" disabled>WHY <span>next</span></button>
+    <button class="tab upcoming" type="button" disabled>TRACE</button>
+    <button class="tab upcoming" type="button" disabled>CHANGES</button>
+  </nav>
+
+  <main>
+    <section id="emptyState" class="empty-state">
+      <div class="empty-icon">&lt;/&gt;</div>
+      <h1>Pick an element</h1>
+      <p>WhyDOM stays active after each capture. Click elements on the page to inspect and copy them.</p>
+      <p class="hint"><kbd>Esc</kbd> ends the inspection session.</p>
+    </section>
+
+    <section id="inspector" class="inspector hidden">
+      <div class="element-heading">
+        <div>
+          <div class="eyebrow">SELECTED ELEMENT</div>
+          <code id="selector" class="selector"></code>
+        </div>
+        <button id="copySelector" class="icon-button" type="button">Copy selector</button>
+      </div>
+
+      <div class="metrics">
+        <div class="metric"><span>Width</span><strong id="metricWidth">-</strong></div>
+        <div class="metric"><span>Height</span><strong id="metricHeight">-</strong></div>
+        <div class="metric"><span>Display</span><strong id="metricDisplay">-</strong></div>
+        <div class="metric"><span>Position</span><strong id="metricPosition">-</strong></div>
+      </div>
+
+      <section id="warningCard" class="warning-card hidden">
+        <strong id="warningTitle"></strong>
+        <div id="warningText"></div>
+      </section>
+
+      <section class="panel-section">
+        <h2>Layout</h2>
+        <dl class="facts">
+          <div><dt>Box sizing</dt><dd id="boxSizing">-</dd></div>
+          <div><dt>Min width</dt><dd id="minWidth">-</dd></div>
+          <div><dt>Max width</dt><dd id="maxWidth">-</dd></div>
+          <div><dt>Overflow X</dt><dd id="overflowX">-</dd></div>
+          <div><dt>Overflow Y</dt><dd id="overflowY">-</dd></div>
+          <div><dt>Z index</dt><dd id="zIndex">-</dd></div>
+        </dl>
+      </section>
+
+      <section class="panel-section">
+        <h2>Parent layout</h2>
+        <code id="parentSelector" class="sub-selector">-</code>
+        <dl class="facts">
+          <div><dt>Display</dt><dd id="parentDisplay">-</dd></div>
+          <div><dt>Width</dt><dd id="parentWidth">-</dd></div>
+          <div><dt>Gap</dt><dd id="parentGap">-</dd></div>
+          <div><dt>Align</dt><dd id="parentAlign">-</dd></div>
+        </dl>
+      </section>
+
+      <section id="stackingSection" class="panel-section hidden">
+        <h2>Stacking context</h2>
+        <ul id="stackingReasons" class="reason-list"></ul>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-heading">
+          <h2>CSS</h2>
+          <button id="copyCss" class="primary-button" type="button">Copy CSS</button>
+        </div>
+        <pre id="cssOutput"></pre>
+      </section>
+
+      <section class="panel-section compact">
+        <div class="section-heading">
+          <h2>Element</h2>
+          <button id="copyHtml" class="secondary-button" type="button">Copy HTML</button>
+        </div>
+        <p id="textPreview" class="text-preview"></p>
+        <div id="sourceStats" class="source-stats"></div>
+      </section>
+    </section>
+  </main>
+
+  <div id="panelToast" class="panel-toast" role="status"></div>
+  <script src="panel.js"></script>
+</body>
+</html>
