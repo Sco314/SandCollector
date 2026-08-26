@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "WhyDOM",
+  "version": "0.1.0",
+  "description": "Free CSS inspector and front-end debugger. Click an element, copy useful CSS, and understand what controls it.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "clipboardWrite"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+  "action": {
+    "default_title": "WhyDOM: Pick an element"
+  }
+}
