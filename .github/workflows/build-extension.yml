@@ -42,6 +42,7 @@ jobs:
               Path('src/background/service-worker.js'),
               Path('src/content/element-snapshot.js'),
               Path('src/content/capture-quality.js'),
+              Path('src/content/capture-safety.js'),
               Path('src/content/picker.js'),
               Path('src/content/picker.css'),
               Path('src/panel/panel.html'),
@@ -71,6 +72,7 @@ jobs:
           node --check src/background/service-worker.js
           node --check src/content/element-snapshot.js
           node --check src/content/capture-quality.js
+          node --check src/content/capture-safety.js
           node --check src/content/picker.js
           node --check src/panel/panel.js
 
