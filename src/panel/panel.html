@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>WhyDOM</title>
   <link rel="stylesheet" href="panel.css">
+  <link rel="stylesheet" href="why.css">
 </head>
 <body>
   <header class="app-header">
@@ -16,8 +17,8 @@
   </header>
 
   <nav class="tabs" aria-label="WhyDOM tools">
-    <button class="tab active" type="button">INSPECT</button>
-    <button class="tab upcoming" type="button" disabled>WHY <span>next</span></button>
+    <button id="inspectTab" class="tab active" type="button">INSPECT</button>
+    <button id="whyTab" class="tab" type="button">WHY</button>
     <button class="tab upcoming" type="button" disabled>TRACE</button>
     <button class="tab upcoming" type="button" disabled>CHANGES</button>
   </nav>
@@ -110,9 +111,59 @@
         <div id="sourceStats" class="source-stats"></div>
       </section>
     </section>
+
+    <section id="whyPane" class="why-pane hidden">
+      <div class="why-heading">
+        <div>
+          <div class="eyebrow">WHY / OVERFLOW</div>
+          <code id="whySelector" class="selector">Pick an element</code>
+        </div>
+        <button id="copyWhy" class="secondary-button" type="button">Copy WHY</button>
+      </div>
+
+      <section id="whyNoSnapshot" class="why-state-card">
+        <h1>Pick an element first</h1>
+        <p>The first WHY engine diagnoses measurable layout overflow and shows the evidence behind its conclusion.</p>
+      </section>
+
+      <section id="whyResult" class="hidden">
+        <div class="why-status-row">
+          <span id="whyStatus" class="why-status">READY</span>
+          <span id="whyConfidence" class="why-confidence">Confidence</span>
+        </div>
+
+        <h1 id="whySummary" class="why-summary"></h1>
+
+        <section class="why-card">
+          <div class="section-heading">
+            <h2>Evidence</h2>
+          </div>
+          <dl id="whyEvidence" class="why-evidence"></dl>
+        </section>
+
+        <section id="whyFixCard" class="why-card hidden">
+          <div class="section-heading">
+            <h2>Suggested fix</h2>
+            <button id="copyFix" class="secondary-button" type="button">Copy Fix</button>
+          </div>
+          <div id="whyFixTitle" class="why-fix-title"></div>
+          <pre id="whyFixCss"></pre>
+          <div class="why-actions">
+            <button id="tryFix" class="primary-button" type="button">Try Fix</button>
+            <button id="undoFix" class="secondary-button hidden" type="button">Undo</button>
+          </div>
+        </section>
+
+        <section id="whyVerification" class="why-verification hidden">
+          <strong id="verificationTitle"></strong>
+          <div id="verificationMetrics"></div>
+        </section>
+      </section>
+    </section>
   </main>
 
   <div id="panelToast" class="panel-toast" role="status"></div>
   <script src="panel.js"></script>
+  <script src="why-panel.js"></script>
 </body>
 </html>
