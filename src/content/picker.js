@@ -114,11 +114,33 @@
     moveHighlight(candidate);
   }
 
+  function resolveLiveClickTarget(event) {
+    const eventTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
+    if (eventTarget instanceof Element && eventTarget.isConnected && !isWhyDomUi(eventTarget)) {
+      return eventTarget;
+    }
+
+    const hit = document.elementFromPoint(event.clientX, event.clientY);
+    if (hit instanceof Element && hit.isConnected && !isWhyDomUi(hit)) {
+      return hit;
+    }
+
+    if (state.target instanceof Element && state.target.isConnected && !isWhyDomUi(state.target)) {
+      return state.target;
+    }
+
+    return null;
+  }
+
   async function onClick(event) {
     if (!state.active) return;
 
-    const target = state.target || event.target;
-    if (!(target instanceof Element) || isWhyDomUi(target)) return;
+    const target = resolveLiveClickTarget(event);
+    if (!(target instanceof Element)) {
+      showToast("Page changed before WhyDOM could capture that element", "error");
+      clearHighlight();
+      return;
+    }
 
     event.preventDefault();
     event.stopPropagation();
@@ -150,7 +172,8 @@
       console.debug("WhyDOM element snapshot", snapshot);
     } catch (error) {
       console.error("WhyDOM capture failed", error);
-      showToast("WhyDOM could not capture this element", "error");
+      clearHighlight();
+      showToast("Page changed before WhyDOM could capture that element", "error");
     }
   }
 
