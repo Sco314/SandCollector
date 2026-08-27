@@ -3,6 +3,7 @@ const CONTENT_FILES = [
   "src/content/capture-quality.js",
   "src/content/capture-safety.js",
   "src/content/copy-polish.js",
+  "src/content/selector-consistency.js",
   "src/content/picker.js"
 ];
 
