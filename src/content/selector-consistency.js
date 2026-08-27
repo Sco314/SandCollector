@@ -18,6 +18,7 @@
   ]);
 
   const UTILITY_PREFIX = /^(?:m|mx|my|mt|mr|mb|ml|p|px|py|pt|pr|pb|pl|gap|space|w|h|size|min-w|max-w|min-h|max-h|leading|text|font|z|top|right|bottom|left|inset|rounded|bg|border|shadow|opacity|overflow|whitespace|items|justify|content|self|basis|flex|grid|col|row|order|object|aspect|transition|duration|delay|ease|cursor|outline|ring)-/;
+  const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
 
   function escapeIdentifier(value) {
     const text = String(value);
@@ -37,8 +38,28 @@
     }
   }
 
-  function isHashedClass(name) {
-    return /^(?:css|jsx|sc)-?[a-z0-9]{6,}$/i.test(name) || /[a-f0-9]{12,}/i.test(name);
+  function isWhyDomClass(name) {
+    return /^__whydom(?:-|$)/i.test(String(name || ""));
+  }
+
+  function isGeneratedClass(name) {
+    const text = String(name || "");
+    if (isWhyDomClass(text)) return true;
+    if (/^__variable_[a-z0-9_-]+$/i.test(text)) return true;
+    if (/^__className_[a-z0-9_-]+$/i.test(text)) return true;
+    if (/^(?:css|jsx|sc)-?[a-z0-9]{6,}$/i.test(text)) return true;
+    if (/[a-f0-9]{12,}/i.test(text)) return true;
+    return false;
+  }
+
+  function isStableId(id) {
+    const text = String(id || "");
+    if (!text || text.length > 120) return false;
+    if (/^__whydom/i.test(text)) return false;
+    if (UUID_PATTERN.test(text)) return false;
+    if (/^_?R_[a-z0-9]+/i.test(text)) return false;
+    if (/^:r[0-9a-z]+:$/i.test(text)) return false;
+    return true;
   }
 
   function normalizeUtilityClass(name) {
@@ -53,7 +74,10 @@
   }
 
   function usableClass(name) {
-    return Boolean(name) && name.length <= 80 && /^-?[_a-zA-Z]+[_a-zA-Z0-9-]*$/.test(name) && !isHashedClass(name);
+    return Boolean(name)
+      && name.length <= 80
+      && /^-?[_a-zA-Z]+[_a-zA-Z0-9-]*$/.test(name)
+      && !isGeneratedClass(name);
   }
 
   function candidate(selector, score, kind, reason) {
@@ -64,7 +88,7 @@
     const tag = element.localName || element.tagName.toLowerCase();
     const candidates = [];
 
-    if (element.id) {
+    if (isStableId(element.id)) {
       candidates.push(candidate(`#${escapeIdentifier(element.id)}`, 100, "semantic", "unique id"));
     }
 
@@ -121,35 +145,105 @@
     return candidates.sort((a, b) => b.score - a.score || a.selector.length - b.selector.length);
   }
 
+  function uniqueStableDirectSelector(element) {
+    for (const item of directCandidates(element)) {
+      if (item.score < 65) continue;
+      if (isUnique(item.selector)) return item;
+    }
+    return null;
+  }
+
   function bestSemanticSegment(element) {
     const semantic = directCandidates(element).find((item) => item.score >= 65);
     return semantic?.selector || (element.localName || element.tagName.toLowerCase());
   }
 
-  function bestFallbackSegment(element) {
-    const direct = directCandidates(element);
-    const semantic = direct.find((item) => item.score >= 65);
-    if (semantic) return semantic.selector;
-    const utility = direct.find((item) => item.kind === "utility");
-    if (utility) return utility.selector;
-    return element.localName || element.tagName.toLowerCase();
-  }
-
-  function nthSegment(element) {
-    const base = bestFallbackSegment(element);
+  function relativeChildSegment(element) {
     const parent = element.parentElement;
-    if (!parent || base.startsWith("#") || base.includes("[")) return base;
+    const tag = element.localName || element.tagName.toLowerCase();
+    if (!parent) return tag;
 
-    let matching = [];
-    try {
-      matching = [...parent.children].filter((child) => child.matches(base));
-    } catch (error) {
-      matching = [];
+    const semantic = directCandidates(element).find((item) => item.score >= 65);
+    if (semantic) {
+      try {
+        const siblings = [...parent.children].filter((child) => child.matches(semantic.selector));
+        if (siblings.length === 1) return semantic.selector;
+      } catch (error) {
+        // Fall through to structural child segment.
+      }
     }
 
-    if (matching.length <= 1) return base;
     const sameTag = [...parent.children].filter((child) => child.localName === element.localName);
-    return `${base}:nth-of-type(${sameTag.indexOf(element) + 1})`;
+    if (sameTag.length === 1) return tag;
+    return `${tag}:nth-of-type(${sameTag.indexOf(element) + 1})`;
+  }
+
+  function anchoredPath(element, maxDepth = 10) {
+    const descendants = [];
+    let current = element;
+
+    for (let depth = 0; current && current instanceof Element && depth <= maxDepth; depth += 1) {
+      const anchor = uniqueStableDirectSelector(current);
+      if (anchor) {
+        let selector = anchor.selector;
+        for (const descendant of [...descendants].reverse()) {
+          selector += ` > ${relativeChildSegment(descendant)}`;
+        }
+        if (isUnique(selector)) {
+          return {
+            selector,
+            quality: {
+              confidence: depth <= 2 ? "medium" : "low",
+              kind: "structural",
+              reason: "stable anchored path",
+              unique: true
+            }
+          };
+        }
+      }
+
+      descendants.push(current);
+      current = current.parentElement;
+    }
+
+    return null;
+  }
+
+  function absolutePositionalPath(element) {
+    const parts = [];
+    let current = element;
+
+    while (current && current instanceof Element) {
+      const tag = current.localName || current.tagName.toLowerCase();
+      if (current === document.documentElement) {
+        parts.unshift("html");
+        break;
+      }
+
+      const parent = current.parentElement;
+      if (!parent) {
+        parts.unshift(tag);
+        break;
+      }
+
+      const sameTag = [...parent.children].filter((child) => child.localName === current.localName);
+      const segment = sameTag.length <= 1
+        ? tag
+        : `${tag}:nth-of-type(${sameTag.indexOf(current) + 1})`;
+      parts.unshift(segment);
+      current = parent;
+    }
+
+    const selector = parts.join(" > ");
+    return {
+      selector,
+      quality: {
+        confidence: "low",
+        kind: "positional",
+        reason: "absolute positional fallback",
+        unique: isUnique(selector)
+      }
+    };
   }
 
   function buildSelectorInfo(element) {
@@ -157,19 +251,17 @@
       return { selector: "", quality: { confidence: "low", kind: "none", reason: "not an element", unique: false } };
     }
 
-    for (const item of directCandidates(element)) {
-      if (item.score < 65) continue;
-      if (isUnique(item.selector)) {
-        return {
-          selector: item.selector,
-          quality: {
-            confidence: item.score >= 85 ? "high" : "medium",
-            kind: item.kind,
-            reason: item.reason,
-            unique: true
-          }
-        };
-      }
+    const direct = uniqueStableDirectSelector(element);
+    if (direct) {
+      return {
+        selector: direct.selector,
+        quality: {
+          confidence: direct.score >= 85 ? "high" : "medium",
+          kind: direct.kind,
+          reason: direct.reason,
+          unique: true
+        }
+      };
     }
 
     const tag = element.localName || element.tagName.toLowerCase();
@@ -180,24 +272,8 @@
       };
     }
 
-    const parts = [];
-    let current = element;
-    for (let depth = 0; current && depth < 6; depth += 1) {
-      parts.unshift(bestSemanticSegment(current));
-      const selector = parts.join(" > ");
-      if (isUnique(selector)) {
-        return {
-          selector,
-          quality: {
-            confidence: depth <= 2 ? "medium" : "low",
-            kind: "structural",
-            reason: "semantic ancestor path",
-            unique: true
-          }
-        };
-      }
-      current = current.parentElement;
-    }
+    const anchored = anchoredPath(element);
+    if (anchored) return anchored;
 
     for (const item of directCandidates(element)) {
       if (item.kind !== "utility") continue;
@@ -209,24 +285,7 @@
       }
     }
 
-    parts.length = 0;
-    current = element;
-    for (let depth = 0; current && depth < 8; depth += 1) {
-      parts.unshift(nthSegment(current));
-      const selector = parts.join(" > ");
-      if (isUnique(selector)) {
-        return {
-          selector,
-          quality: { confidence: "low", kind: "positional", reason: "positional fallback", unique: true }
-        };
-      }
-      current = current.parentElement;
-    }
-
-    return {
-      selector: parts.join(" > "),
-      quality: { confidence: "low", kind: "fallback", reason: "best available fallback", unique: false }
-    };
+    return absolutePositionalPath(element);
   }
 
   function rewriteCssSelector(cssText, selector) {
@@ -240,7 +299,7 @@
     const snapshot = previousCaptureElement(element);
     const selected = buildSelectorInfo(element);
 
-    snapshot.version = Math.max(Number(snapshot.version) || 0, 6);
+    snapshot.version = Math.max(Number(snapshot.version) || 0, 7);
     snapshot.selector = selected.selector;
     snapshot.selectorQuality = selected.quality;
     snapshot.copyCss = rewriteCssSelector(snapshot.copyCss, selected.selector);
