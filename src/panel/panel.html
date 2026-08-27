@@ -32,11 +32,19 @@
 
     <section id="inspector" class="inspector hidden">
       <div class="element-heading">
-        <div>
+        <div class="element-identity">
           <div class="eyebrow">SELECTED ELEMENT</div>
           <code id="selector" class="selector"></code>
+          <div id="selectorMeta" class="selector-meta hidden">
+            <span id="selectorUnique" class="quality-check">Unique</span>
+            <span id="selectorQuality" class="quality-badge">Quality</span>
+            <span id="selectorSource" class="quality-source"></span>
+          </div>
         </div>
-        <button id="copySelector" class="icon-button" type="button">Copy selector</button>
+        <div class="heading-actions">
+          <button id="copyAll" class="primary-button" type="button">Copy All</button>
+          <button id="copySelector" class="icon-button" type="button">Copy selector</button>
+        </div>
       </div>
 
       <div class="metrics">
@@ -52,7 +60,10 @@
       </section>
 
       <section class="panel-section">
-        <h2>Layout</h2>
+        <div class="section-heading">
+          <h2>Layout</h2>
+          <button id="copyLayout" class="secondary-button" type="button">Copy Layout</button>
+        </div>
         <dl class="facts">
           <div><dt>Box sizing</dt><dd id="boxSizing">-</dd></div>
           <div><dt>Min width</dt><dd id="minWidth">-</dd></div>
@@ -64,7 +75,10 @@
       </section>
 
       <section class="panel-section">
-        <h2>Parent layout</h2>
+        <div class="section-heading">
+          <h2>Parent layout</h2>
+          <button id="copyParentLayout" class="secondary-button" type="button">Copy Parent</button>
+        </div>
         <code id="parentSelector" class="sub-selector">-</code>
         <dl class="facts">
           <div><dt>Display</dt><dd id="parentDisplay">-</dd></div>
