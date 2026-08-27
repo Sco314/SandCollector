@@ -38,7 +38,11 @@
   function describeElement(element) {
     const tag = element.tagName.toLowerCase();
     const id = element.id ? `#${element.id}` : "";
-    const classes = [...element.classList].slice(0, 2).map((name) => `.${name}`).join("");
+    const classes = [...element.classList]
+      .filter((name) => !name.startsWith("__whydom"))
+      .slice(0, 2)
+      .map((name) => `.${name}`)
+      .join("");
     return `${tag}${id}${classes}`;
   }
 
@@ -80,7 +84,24 @@
     clearTimeout(showToast.timer);
     showToast.timer = setTimeout(() => {
       state.toast.classList.remove("__whydom-toast-visible");
-    }, 2200);
+    }, 2600);
+  }
+
+  function hasRuntimeContext() {
+    try {
+      return Boolean(globalThis.chrome?.runtime?.id);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function isInvalidatedContextError(error) {
+    return /extension context invalidated/i.test(String(error?.message || error || ""));
+  }
+
+  function handleInvalidatedContext() {
+    stopPicker();
+    showToast("WhyDOM was updated or reloaded. Click the extension again to reconnect to this page.", "error");
   }
 
   async function writeClipboard(text) {
@@ -105,6 +126,11 @@
 
   function onPointerMove(event) {
     if (!state.active) return;
+
+    if (!hasRuntimeContext()) {
+      handleInvalidatedContext();
+      return;
+    }
 
     const candidate = document.elementFromPoint(event.clientX, event.clientY);
     if (!(candidate instanceof Element) || isWhyDomUi(candidate)) return;
@@ -135,6 +161,14 @@
   async function onClick(event) {
     if (!state.active) return;
 
+    // Reloading/updating an unpacked extension invalidates already-injected
+    // content-script contexts. Do not consume the page click or throw a noisy
+    // runtime error from that orphaned script; end the stale picker instead.
+    if (!hasRuntimeContext()) {
+      handleInvalidatedContext();
+      return;
+    }
+
     const target = resolveLiveClickTarget(event);
     if (!(target instanceof Element)) {
       showToast("Page changed before WhyDOM could capture that element", "error");
@@ -153,13 +187,21 @@
       const copied = await writeClipboard(snapshot.copyCss);
       const width = Math.round(snapshot.layoutFacts.rect.width);
       const height = Math.round(snapshot.layoutFacts.rect.height);
-      const overflow = snapshot.layoutFacts.scroll.overflowsX || snapshot.layoutFacts.scroll.overflowsY;
+      const overflowDiagnostic = snapshot.diagnostics?.overflow;
+      const overflow = overflowDiagnostic
+        ? overflowDiagnostic.status === "problem"
+        : snapshot.layoutFacts.scroll.overflowsX || snapshot.layoutFacts.scroll.overflowsY;
       const suffix = overflow ? " · overflow detected" : "";
 
-      chrome.runtime.sendMessage({
+      if (!hasRuntimeContext()) {
+        handleInvalidatedContext();
+        return;
+      }
+
+      await chrome.runtime.sendMessage({
         type: "WHYDOM_CAPTURED",
         snapshot
-      }).catch(() => {});
+      });
 
       clearHighlight();
       showToast(
@@ -171,8 +213,12 @@
 
       console.debug("WhyDOM element snapshot", snapshot);
     } catch (error) {
-      console.error("WhyDOM capture failed", error);
       clearHighlight();
+      if (isInvalidatedContextError(error) || !hasRuntimeContext()) {
+        handleInvalidatedContext();
+        return;
+      }
+      console.error("WhyDOM capture failed", error);
       showToast("Page changed before WhyDOM could capture that element", "error");
     }
   }
@@ -189,6 +235,11 @@
     ensureUi();
     if (state.active) return;
 
+    if (!hasRuntimeContext()) {
+      showToast("WhyDOM needs to reconnect to this page. Click the extension again.", "error");
+      return;
+    }
+
     state.active = true;
     document.documentElement.classList.add("__whydom-picking");
     document.addEventListener("pointermove", onPointerMove, true);
@@ -198,8 +249,6 @@
   }
 
   function stopPicker() {
-    if (!state.active) return;
-
     state.active = false;
     document.documentElement.classList.remove("__whydom-picking");
     document.removeEventListener("pointermove", onPointerMove, true);
@@ -216,7 +265,7 @@
     }
 
     startPicker();
-    return true;
+    return state.active;
   }
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
