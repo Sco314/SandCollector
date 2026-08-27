@@ -30,6 +30,126 @@ function prettyNumber(value) {
   return `${Math.round(value * 100) / 100}px`;
 }
 
+function titleCase(value = "") {
+  return String(value)
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function qualityLabel(snapshot) {
+  const quality = snapshot?.selectorQuality || {};
+  return titleCase(quality.confidence || "unknown");
+}
+
+function qualitySource(snapshot) {
+  const quality = snapshot?.selectorQuality || {};
+  return quality.reason ? titleCase(quality.reason) : "Unknown source";
+}
+
+function formatLayout(snapshot) {
+  if (!snapshot) return "";
+  const facts = snapshot.layoutFacts || {};
+  const rect = facts.rect || {};
+  const layout = facts.layout || {};
+
+  return [
+    "LAYOUT",
+    `Width: ${prettyNumber(rect.width)}`,
+    `Height: ${prettyNumber(rect.height)}`,
+    `Display: ${layout.display || "-"}`,
+    `Position: ${layout.position || "-"}`,
+    `Box sizing: ${layout.boxSizing || "-"}`,
+    `Min width: ${layout.minWidth || "-"}`,
+    `Max width: ${layout.maxWidth || "-"}`,
+    `Overflow X: ${layout.overflowX || "-"}`,
+    `Overflow Y: ${layout.overflowY || "-"}`,
+    `Z index: ${layout.zIndex || "-"}`
+  ].join("\n");
+}
+
+function formatParentLayout(snapshot) {
+  if (!snapshot) return "";
+  const parent = snapshot.layoutFacts?.parentLayout || {};
+
+  return [
+    "PARENT LAYOUT",
+    `Selector: ${parent.selector || "-"}`,
+    `Display: ${parent.display || "-"}`,
+    `Width: ${parent.width || "-"}`,
+    `Gap: ${parent.gap || "-"}`,
+    `Align: ${parent.alignItems || "-"}`
+  ].join("\n");
+}
+
+function formatSelectorDetails(snapshot) {
+  if (!snapshot) return "";
+  const quality = snapshot.selectorQuality || {};
+  const lines = [
+    "SELECTOR",
+    snapshot.selector || "-",
+    `Unique: ${quality.unique === false ? "No" : quality.unique === true ? "Yes" : "Unknown"}`,
+    `Quality: ${qualityLabel(snapshot)}`,
+    `Source: ${qualitySource(snapshot)}`
+  ];
+  return lines.join("\n");
+}
+
+function formatStacking(snapshot) {
+  const reasons = snapshot?.layoutFacts?.stackingContextReasons || [];
+  if (!reasons.length) return "";
+  return ["STACKING CONTEXT", ...reasons.map((reason) => `- ${reason}`)].join("\n");
+}
+
+function formatCopyAll(snapshot) {
+  if (!snapshot) return "";
+
+  const sections = [
+    "WhyDOM Element Snapshot",
+    snapshot.url ? `URL: ${snapshot.url}` : "",
+    formatSelectorDetails(snapshot),
+    formatLayout(snapshot),
+    formatParentLayout(snapshot),
+    formatStacking(snapshot),
+    snapshot.copyCss ? `CSS\n${snapshot.copyCss}` : "",
+    `ELEMENT\nText: ${snapshot.dom?.textPreview || "No text content."}`,
+    `Authored rules: ${snapshot.authoredRules?.length || 0}`,
+    snapshot.inaccessibleStylesheets
+      ? `Inaccessible stylesheets: ${snapshot.inaccessibleStylesheets}`
+      : ""
+  ].filter(Boolean);
+
+  return sections.join("\n\n");
+}
+
+function renderSelectorQuality(snapshot) {
+  const quality = snapshot?.selectorQuality;
+  const meta = $("selectorMeta");
+
+  if (!quality) {
+    meta.classList.add("hidden");
+    return;
+  }
+
+  meta.classList.remove("hidden");
+
+  const unique = $("selectorUnique");
+  if (quality.unique === true) {
+    unique.textContent = "✓ Unique";
+    unique.dataset.state = "good";
+  } else if (quality.unique === false) {
+    unique.textContent = "Not unique";
+    unique.dataset.state = "bad";
+  } else {
+    unique.textContent = "Uniqueness unknown";
+    unique.dataset.state = "neutral";
+  }
+
+  const qualityEl = $("selectorQuality");
+  qualityEl.textContent = `${qualityLabel(snapshot)} quality`;
+  qualityEl.dataset.quality = quality.confidence || "unknown";
+  setText("selectorSource", qualitySource(snapshot));
+}
+
 function renderSnapshot(snapshot) {
   currentSnapshot = snapshot;
 
@@ -49,6 +169,7 @@ function renderSnapshot(snapshot) {
   const parent = facts.parentLayout || {};
 
   setText("selector", snapshot.selector);
+  renderSelectorQuality(snapshot);
   setText("metricWidth", prettyNumber(rect.width));
   setText("metricHeight", prettyNumber(rect.height));
   setText("metricDisplay", layout.display);
@@ -141,6 +262,9 @@ async function loadActiveTab() {
   }
 }
 
+$("copyAll").addEventListener("click", () => copyText(formatCopyAll(currentSnapshot), "All details"));
+$("copyLayout").addEventListener("click", () => copyText(formatLayout(currentSnapshot), "Layout"));
+$("copyParentLayout").addEventListener("click", () => copyText(formatParentLayout(currentSnapshot), "Parent layout"));
 $("copyCss").addEventListener("click", () => copyText(currentSnapshot?.copyCss, "CSS"));
 $("copySelector").addEventListener("click", () => copyText(currentSnapshot?.selector, "Selector"));
 $("copyHtml").addEventListener("click", () => copyText(currentSnapshot?.dom?.outerHTML, "HTML"));
