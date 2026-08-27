@@ -6,6 +6,7 @@ const CONTENT_FILES = [
   "src/content/selector-consistency.js",
   "src/content/overflow-diagnostic.js",
   "src/content/overflow-precision.js",
+  "src/content/overflow-layout-precision.js",
   "src/content/picker.js"
 ];
 
