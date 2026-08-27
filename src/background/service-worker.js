@@ -1,5 +1,6 @@
 const CONTENT_FILES = [
   "src/content/element-snapshot.js",
+  "src/content/capture-quality.js",
   "src/content/picker.js"
 ];
 
