@@ -7,12 +7,17 @@
   const originalCaptureElement = WhyDOM.captureElement;
 
   const GENERIC_UTILITY_CLASSES = new Set([
-    "block", "inline", "inline-block", "flex", "inline-flex", "grid", "hidden",
+    "block", "inline", "inline-block", "flex", "inline-flex", "grid", "inline-grid", "hidden",
     "relative", "absolute", "fixed", "sticky", "static", "group", "container",
-    "grow", "shrink", "truncate", "uppercase", "lowercase", "capitalize"
+    "grow", "shrink", "truncate", "uppercase", "lowercase", "capitalize",
+    "flex-none", "flex-auto", "flex-initial", "flex-wrap", "flex-nowrap",
+    "ease-in", "ease-out", "ease-in-out", "transition", "transition-all",
+    "items-start", "items-center", "items-end", "items-stretch",
+    "justify-start", "justify-center", "justify-end", "justify-between",
+    "text-left", "text-center", "text-right", "whitespace-nowrap"
   ]);
 
-  const UTILITY_PREFIX = /^(?:m|mx|my|mt|mr|mb|ml|p|px|py|pt|pr|pb|pl|gap|space|w|h|min-w|max-w|min-h|max-h|leading|text|font|z|top|right|bottom|left|inset|rounded|bg|border|shadow|opacity|overflow|whitespace|items|justify|content|self|basis|grid|col|row|order|object|aspect)-/;
+  const UTILITY_PREFIX = /^(?:m|mx|my|mt|mr|mb|ml|p|px|py|pt|pr|pb|pl|gap|space|w|h|size|min-w|max-w|min-h|max-h|leading|text|font|z|top|right|bottom|left|inset|rounded|bg|border|shadow|opacity|overflow|whitespace|items|justify|content|self|basis|flex|grid|col|row|order|object|aspect|transition|duration|delay|ease|cursor|outline|ring)-/;
 
   const DEFAULT_VALUES = {
     position: new Set(["static"]),
@@ -194,19 +199,24 @@
     return candidates.sort((a, b) => b.score - a.score || a.selector.length - b.selector.length);
   }
 
-  function bestSegment(element) {
+  function bestSemanticSegment(element) {
     const direct = directCandidates(element);
-    const semantic = direct.find((item) => item.score >= 70);
+    const semantic = direct.find((item) => item.score >= 65);
     if (semantic) return semantic.selector;
+    return element.localName || element.tagName.toLowerCase();
+  }
 
+  function bestFallbackSegment(element) {
+    const direct = directCandidates(element);
+    const semantic = direct.find((item) => item.score >= 65);
+    if (semantic) return semantic.selector;
     const utility = direct.find((item) => item.kind === "utility");
     if (utility) return utility.selector;
-
     return element.localName || element.tagName.toLowerCase();
   }
 
   function nthSegment(element) {
-    const base = bestSegment(element);
+    const base = bestFallbackSegment(element);
     const parent = element.parentElement;
     if (!parent || base.startsWith("#") || base.includes("[")) return base;
 
@@ -228,12 +238,15 @@
       return { selector: "", quality: { confidence: "low", kind: "none", reason: "not an element" } };
     }
 
+    // Direct answers are accepted only when they carry semantic identity.
+    // Utility classes are deferred until after short ancestor paths are tried.
     for (const item of directCandidates(element)) {
+      if (item.score < 65) continue;
       if (isUnique(item.selector)) {
         return {
           selector: item.selector,
           quality: {
-            confidence: item.score >= 85 ? "high" : item.score >= 65 ? "medium" : "low",
+            confidence: item.score >= 85 ? "high" : "medium",
             kind: item.kind,
             reason: item.reason,
             unique: true
@@ -242,18 +255,35 @@
       }
     }
 
+    // Prefer a stable semantic ancestor + plain child tags over a utility selector.
     const parts = [];
     let current = element;
     for (let depth = 0; current && depth < 6; depth += 1) {
-      parts.unshift(bestSegment(current));
+      parts.unshift(bestSemanticSegment(current));
       const selector = parts.join(" > ");
       if (isUnique(selector)) {
         return {
           selector,
-          quality: { confidence: "medium", kind: "structural", reason: "short ancestor path", unique: true }
+          quality: {
+            confidence: depth <= 2 ? "medium" : "low",
+            kind: "structural",
+            reason: "semantic ancestor path",
+            unique: true
+          }
         };
       }
       current = current.parentElement;
+    }
+
+    // Only now allow a unique utility-class selector as a compact fallback.
+    for (const item of directCandidates(element)) {
+      if (item.kind !== "utility") continue;
+      if (isUnique(item.selector)) {
+        return {
+          selector: item.selector,
+          quality: { confidence: "low", kind: "utility", reason: "unique utility fallback", unique: true }
+        };
+      }
     }
 
     parts.length = 0;
@@ -300,7 +330,15 @@
     const values = [...new Set(pool.map((item) => item.value))];
 
     if (values.length === 1 && !values[0].includes("var(")) return values[0];
-    return computedValue;
+
+    // auto margins resolve to pixel values in computed style; retain authored intent.
+    if (["margin-left", "margin-right", "margin-top", "margin-bottom"].includes(property) && values.includes("auto")) {
+      return "auto";
+    }
+
+    // Prefer the last non-variable authored value as a best-effort cascade approximation.
+    const lastUsable = [...pool].reverse().find((item) => item.value && !item.value.includes("var("));
+    return lastUsable?.value || computedValue;
   }
 
   function hasAuthoredProperty(element, snapshot, property) {
@@ -313,7 +351,7 @@
     return match?.[1] || null;
   }
 
-  function shouldInclude(element, snapshot, property, value, style) {
+  function shouldInclude(element, snapshot, property, value, style, included) {
     if (!value) return false;
     if (DEFAULT_VALUES[property]?.has(value)) return false;
 
@@ -354,20 +392,29 @@
       if (!hasAuthoredProperty(element, snapshot, property)) return false;
     }
 
+    // Avoid shorthand + longhand duplication in copied output.
+    if (["row-gap", "column-gap"].includes(property) && included.has("gap")) return false;
+    if (["overflow-x", "overflow-y"].includes(property) && included.has("overflow")) {
+      const axisValue = property === "overflow-x" ? style["overflow-x"] : style["overflow-y"];
+      if (axisValue === style.overflow) return false;
+    }
+
     return true;
   }
 
   function formatCleanerCss(element, snapshot) {
     const style = snapshot.computedStyles || {};
     const lines = [];
+    const included = new Set();
 
     for (const property of COPY_PROPERTIES) {
       const computedValue = style[property];
       if (!computedValue) continue;
 
       const value = preferredSourceValue(element, snapshot, property, computedValue);
-      if (!shouldInclude(element, snapshot, property, value, style)) continue;
+      if (!shouldInclude(element, snapshot, property, value, style, included)) continue;
       lines.push(`  ${property}: ${value};`);
+      included.add(property);
     }
 
     return `${snapshot.selector} {\n${lines.join("\n")}\n}`;
@@ -377,7 +424,7 @@
     const snapshot = originalCaptureElement(element);
     const selectorResult = buildBetterSelector(element);
 
-    snapshot.version = Math.max(Number(snapshot.version) || 0, 3);
+    snapshot.version = Math.max(Number(snapshot.version) || 0, 4);
     snapshot.selector = selectorResult.selector;
     snapshot.selectorQuality = selectorResult.quality;
     snapshot.copyCss = formatCleanerCss(element, snapshot);
