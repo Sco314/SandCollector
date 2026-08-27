@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WhyDOM Overflow Lab</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font: 16px/1.4 system-ui, sans-serif; margin: 32px; background: #f5f5f5; color: #111; }
+    main { max-width: 900px; margin: auto; }
+    section { margin: 24px 0; padding: 18px; background: white; border: 1px solid #ccc; }
+    .label { font-weight: 700; margin-bottom: 10px; }
+    .frame { width: 320px; padding: 12px; border: 2px solid #777; background: #fafafa; }
+
+    .flex-parent { display: flex; width: 320px; border: 2px solid #777; }
+    #flex-min-auto { min-width: auto; background: #ffe7b8; }
+    #flex-min-auto .wide-content { width: 520px; height: 48px; background: #f5b041; }
+
+    #nowrap-case { width: 260px; overflow: hidden; white-space: nowrap; background: #d6eaff; }
+
+    #image-case { width: 280px; overflow: auto; }
+    #image-case img { width: 560px; max-width: none; display: block; }
+
+    #fixed-width-case { width: 520px; height: 60px; background: #d9f7d9; }
+
+    .grid-parent { display: grid; grid-template-columns: 280px; width: 280px; border: 2px solid #777; }
+    #grid-min-auto { min-width: auto; background: #f4ddff; }
+    #grid-min-auto .wide-content { width: 480px; height: 48px; background: #c084fc; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>WhyDOM Overflow Lab</h1>
+    <p>Each highlighted element intentionally contains a known overflow cause.</p>
+
+    <section>
+      <div class="label">Flex automatic minimum size — expected fix: min-width: 0</div>
+      <div class="flex-parent">
+        <div id="flex-min-auto"><div class="wide-content">520px child inside a 320px flex parent</div></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="label">No-wrap text — expected fix: white-space: normal</div>
+      <div class="frame">
+        <div id="nowrap-case">This intentionally long line is not allowed to wrap and must overflow the available width.</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="label">Oversized image — expected fix: max-width: 100%</div>
+      <div id="image-case">
+        <img alt="Oversized test placeholder" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='560' height='100'%3E%3Crect width='560' height='100' fill='%2399c2ff'/%3E%3Ctext x='20' y='58' font-size='26'%3E560px image%3C/text%3E%3C/svg%3E">
+      </div>
+    </section>
+
+    <section>
+      <div class="label">Authored fixed width — expected fix: max-width: 100%</div>
+      <div class="frame">
+        <div id="fixed-width-case">520px fixed width inside a narrower parent</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="label">Grid automatic minimum size — expected fix: min-width: 0</div>
+      <div class="grid-parent">
+        <div id="grid-min-auto"><div class="wide-content">480px child inside a 280px grid track</div></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
