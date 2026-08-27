@@ -9,6 +9,8 @@
   --muted: #9ba7b6;
   --accent: #7c8cff;
   --warning: #f7c66f;
+  --good: #7ad9a5;
+  --bad: #ff8c8c;
 }
 
 * { box-sizing: border-box; }
@@ -21,7 +23,6 @@ body {
 }
 
 button, code, pre, kbd { font: inherit; }
-
 button { cursor: pointer; }
 button:disabled { cursor: default; }
 
@@ -102,6 +103,14 @@ kbd {
   gap: 10px;
 }
 .element-heading { margin-bottom: 12px; }
+.element-identity { min-width: 0; flex: 1; }
+.heading-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  flex: 0 0 auto;
+}
 .eyebrow { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .1em; }
 .selector,
 .sub-selector {
@@ -112,6 +121,32 @@ kbd {
   font-size: 12px;
   overflow-wrap: anywhere;
 }
+
+.selector-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 9.5px;
+}
+.quality-check,
+.quality-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.quality-check[data-state="good"] { color: var(--good); }
+.quality-check[data-state="bad"] { color: var(--bad); }
+.quality-badge[data-quality="high"] { color: var(--good); }
+.quality-badge[data-quality="medium"] { color: var(--warning); }
+.quality-badge[data-quality="low"] { color: var(--bad); }
+.quality-source { overflow-wrap: anywhere; }
 
 .icon-button,
 .secondary-button,
@@ -162,7 +197,8 @@ kbd {
 }
 .panel-section.compact { padding-bottom: 9px; }
 h2 { margin: 0 0 9px; font-size: 12px; }
-.section-heading h2 { margin-top: 4px; }
+.section-heading { align-items: center; margin-bottom: 8px; }
+.section-heading h2 { margin: 0; }
 
 .facts { margin: 0; }
 .facts > div {
@@ -226,3 +262,9 @@ pre {
   transition: opacity .15s ease, transform .15s ease;
 }
 .panel-toast.visible { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 360px) {
+  .element-heading { flex-direction: column; }
+  .heading-actions { width: 100%; flex-direction: row; }
+  .heading-actions > button { flex: 1; }
+}
