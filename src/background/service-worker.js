@@ -4,6 +4,7 @@ const CONTENT_FILES = [
   "src/content/capture-safety.js",
   "src/content/copy-polish.js",
   "src/content/selector-consistency.js",
+  "src/content/overflow-diagnostic.js",
   "src/content/picker.js"
 ];
 
