@@ -44,6 +44,7 @@ jobs:
               Path('src/content/capture-quality.js'),
               Path('src/content/capture-safety.js'),
               Path('src/content/copy-polish.js'),
+              Path('src/content/selector-consistency.js'),
               Path('src/content/picker.js'),
               Path('src/content/picker.css'),
               Path('src/panel/panel.html'),
@@ -75,6 +76,7 @@ jobs:
           node --check src/content/capture-quality.js
           node --check src/content/capture-safety.js
           node --check src/content/copy-polish.js
+          node --check src/content/selector-consistency.js
           node --check src/content/picker.js
           node --check src/panel/panel.js
 
